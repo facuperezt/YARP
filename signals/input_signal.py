@@ -109,7 +109,7 @@ class UnitEnergyChippedSignal:
 #%%
 if __name__ == "__main__":
     # Plots the same Zadoff-Chu sequence from wikipedia, but in discrete time using the unit-energy pulse
-    L, q, bandwidth, N = 353, 7, 1, 0
+    L, q, bandwidth, N = 353, 7, 1e9, 0
     delta = 1/bandwidth
     zc = ZadoffChuSequence(L=L, q=q)
     z = UnitEnergyChippedSignal(zc, delta=delta)
@@ -118,6 +118,7 @@ if __name__ == "__main__":
     axs[0].plot(t, x_t.real)
     axs[1].plot(t, x_t.imag)
     plt.figure()
-    plt.plot(*z.signal(10, 1e3, 100))
+    amplitude, f0 = 10, 10e6
+    plt.plot(*z.signal(amplitude, f0, N=N))
     plt.show()
 # %%
