@@ -4,8 +4,12 @@ import matplotlib.pyplot as plt
 import numpy as np
 from math import gcd as bltin_gcd
 
-from antennas import Antennas
-from target import Target
+try:
+    from signals.antennas import Antennas
+    from signals.target import Target
+except ModuleNotFoundError:
+    from antennas import Antennas
+    from target import Target
 
 class ZadoffChuSequence:
     """
@@ -157,9 +161,4 @@ if __name__ == "__main__":
     amplitude, f0 = 10, 10e6
     plt.plot(*z.illuminator_signal(amplitude, f0, N=N))
     plt.show()
-
-    target = Target(0.1, 0.2, 0.5*np.pi, 1e-9, 10)
-    antennas = Antennas(10, 1, 1e-9, amplitude, 10)
-    plt.plot(z.backscatter_signal_demodulated(antennas, target, 100)[:, :100])
-
 # %%
