@@ -94,8 +94,12 @@ class UnitEnergyChippedSignal:
         return x, signal
 #%%
 if __name__ == "__main__":
-    L, q, delta, N = 61, 4, 0.15, 10
+    # Plots the same Zadoff-Chu sequence from wikipedia, but in discrete time using the unit-energy pulse
+    L, q, delta, N = 353, 7, 1, 0
     zc = ZadoffChuSequence(L=L, q=q)
     z = UnitEnergyChippedSignal(zc, delta=delta)
     t, x_t = z.signal(N=N)
-    plt.plot(t, x_t)
+    fig, axs = plt.subplots(2, 1, figsize=(20, 5))
+    axs[0].plot(t, x_t.real)
+    axs[1].plot(t, x_t.imag)
+# %%
