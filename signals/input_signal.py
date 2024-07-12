@@ -62,24 +62,27 @@ class UnitEnergyChippedSignal:
         self.delta = delta
         self.resolution = resolution
 
-    def one_cycle(self) -> Tuple[np.ndarray, np.ndarray]:
+    def one_complex_envelope_cycle(self, normalize_pulse_energy: bool = False) -> Tuple[np.ndarray, np.ndarray]:
         """
         Returns one cycle of the complex envelope signal
 
         z(t) in the project
         """
         x = np.linspace(0, self.zc.L*self.delta, int(self.zc.L*self.resolution))
-        return x, np.repeat(self.zc(), self.resolution)*(1/np.sqrt(self.delta))  # Divide by sqrt(delta) to make the pulse unit energy
+        out = np.repeat(self.zc(), self.resolution)
+        if normalize_pulse_energy:
+            out *= (1/np.sqrt(self.delta))  # Divide by sqrt(delta) to make the pulse unit energy
+        return x, out
     
     def compare_sequence_to_cycle(self) -> None:
-        x, cycle = self.one_cycle()
+        x, cycle = self.one_complex_envelope_cycle()
         plt.figure()
         plt.plot(self.zc(), label = "Original Sequence")
         plt.plot(np.linspace(0, len(self.zc()), len(x)), cycle, label = "Resulting Cycle")
         plt.legend()
         plt.show()
 
-    def signal(self, N: int = 0) -> Tuple[np.ndarray, np.ndarray]:
+    def complex_envelope(self, N: int = 0, normalize_pulse_energy: bool = False) -> Tuple[np.ndarray, np.ndarray]:
         """
         Returns the whole signal 
         Not sure what N is, so its a variable now
@@ -88,18 +91,33 @@ class UnitEnergyChippedSignal:
         the return variable x holds the time information
         x(t)
         """
-        cycle = self.one_cycle()[1]
-        signal = np.tile(cycle, N+1)
+        cycle = self.one_complex_envelope_cycle(normalize_pulse_energy)[1]
+        complex_envelope = np.tile(cycle, N+1)
         x = np.linspace(0, self.zc.L*self.delta*(N+1), int(self.zc.L*self.resolution*(N+1)))
-        return x, signal
+        return x, complex_envelope
+    
+    def signal(self, amplitude: float, modulating_frequency: float, N: int = 100, normalize_pulse_energy: bool = False) -> Tuple[np.ndarray, np.ndarray]:
+        """
+        Returns the actual signal
+
+        s(t) = Re{A x(t) e^(j2pifot)}
+        """
+        t, complex_envelope = self.complex_envelope(N=N, normalize_pulse_energy=normalize_pulse_energy)
+        exp = np.exp(1j*2*np.pi*modulating_frequency*t)
+        return t, (amplitude*complex_envelope*exp).real
+
 #%%
 if __name__ == "__main__":
     # Plots the same Zadoff-Chu sequence from wikipedia, but in discrete time using the unit-energy pulse
-    L, q, delta, N = 353, 7, 1, 0
+    L, q, bandwidth, N = 353, 7, 1, 0
+    delta = 1/bandwidth
     zc = ZadoffChuSequence(L=L, q=q)
     z = UnitEnergyChippedSignal(zc, delta=delta)
-    t, x_t = z.signal(N=N)
+    t, x_t = z.complex_envelope(N=N)
     fig, axs = plt.subplots(2, 1, figsize=(20, 5))
     axs[0].plot(t, x_t.real)
     axs[1].plot(t, x_t.imag)
+    plt.figure()
+    plt.plot(*z.signal(10, 1e3, 100))
+    plt.show()
 # %%
