@@ -1,8 +1,11 @@
 #%%
-from typing import Optional, Tuple
+from typing import Iterable, Optional, Tuple
 import matplotlib.pyplot as plt
 import numpy as np
 from math import gcd as bltin_gcd
+
+from antennas import Antennas
+from target import Target
 
 class ZadoffChuSequence:
     """
@@ -48,7 +51,7 @@ class ZadoffChuSequence:
         return np.exp(-1j*np.pi*self.q*((l*(l+1)) / self.L))
 
 
-class UnitEnergyChippedSignal:
+class Signals:
     """
     Handles generating a chipped sequence based of a ZC sequence
     """
@@ -96,7 +99,7 @@ class UnitEnergyChippedSignal:
         x = np.linspace(0, self.zc.L*self.delta*(N+1), int(self.zc.L*self.resolution*(N+1)))
         return x, complex_envelope
     
-    def signal(self, amplitude: float, modulating_frequency: float, N: int = 100, normalize_pulse_energy: bool = False) -> Tuple[np.ndarray, np.ndarray]:
+    def illuminator_signal(self, amplitude: float, modulating_frequency: float, N: int = 100, normalize_pulse_energy: bool = False) -> Tuple[np.ndarray, np.ndarray]:
         """
         Returns the actual signal
 
@@ -105,6 +108,39 @@ class UnitEnergyChippedSignal:
         t, complex_envelope = self.complex_envelope(N=N, normalize_pulse_energy=normalize_pulse_energy)
         exp = np.exp(1j*2*np.pi*modulating_frequency*t)
         return t, (amplitude*complex_envelope*exp).real
+    
+    def _demodulated_backscattered_signal(
+            self,
+            n_antennas: int,
+            dist_antennas: float,
+            wavelength: float,
+            noise_power: float,
+            original_amplitude: float,
+            attenuation: float,
+            phase_shift: float,
+            angle_of_arrival: float,
+            delay: float,
+            doppler_shift: float,
+            N: int,
+            normalize_pulse_energy: bool,
+    ):
+        t, complex_envelope = self.complex_envelope(N=N, normalize_pulse_energy=normalize_pulse_energy)
+        rho = attenuation * np.exp(1j*phase_shift)
+        tau_shift = np.argmin(np.abs((t-delay) - t[0]))
+        t_delayed = t[tau_shift:]
+        complex_envelope_delayed = complex_envelope[tau_shift:]
+        exp1 = np.exp(1j*2*np.pi*doppler_shift*t_delayed)
+        exp2 = np.exp(1j*2*np.pi*np.sin(angle_of_arrival))
+        common_result = rho*original_amplitude*complex_envelope_delayed*exp1*exp2
+        each_result = []
+        for m in range(n_antennas):
+            exp3 = np.exp(1j*2*np.pi*m*(dist_antennas/wavelength))
+            noise = np.random.multivariate_normal(mean=[0, 0], cov=[[noise_power,0],[0,noise_power]])
+            each_result.append(common_result*exp3 + (noise[0] + 1j*noise[1]))
+        return np.stack(each_result)
+
+    def backscatter_signal_demodulated(self, antennas: Antennas, target: Target, N: int, normalize_pulse_energy: bool = False):
+        return self._demodulated_backscattered_signal(*antennas.params, *target.params, N=N, normalize_pulse_energy=normalize_pulse_energy)
 
 #%%
 if __name__ == "__main__":
@@ -112,13 +148,18 @@ if __name__ == "__main__":
     L, q, bandwidth, N = 353, 7, 1e9, 0
     delta = 1/bandwidth
     zc = ZadoffChuSequence(L=L, q=q)
-    z = UnitEnergyChippedSignal(zc, delta=delta)
+    z = Signals(zc, delta=delta)
     t, x_t = z.complex_envelope(N=N)
     fig, axs = plt.subplots(2, 1, figsize=(20, 5))
     axs[0].plot(t, x_t.real)
     axs[1].plot(t, x_t.imag)
     plt.figure()
     amplitude, f0 = 10, 10e6
-    plt.plot(*z.signal(amplitude, f0, N=N))
+    plt.plot(*z.illuminator_signal(amplitude, f0, N=N))
     plt.show()
+
+    target = Target(0.1, 0.2, 0.5*np.pi, 1e-9, 10)
+    antennas = Antennas(10, 1, 1e-9, amplitude, 10)
+    plt.plot(z.backscatter_signal_demodulated(antennas, target, 100)[:, :100])
+
 # %%
